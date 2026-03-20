@@ -3094,8 +3094,8 @@
             "Molecular mass determination",
             "Empirical formula determination"
           ],
-          "correct": 3,
-          "explanation": "**Ethanal** ($\\ce{C2H4O}$) vs **propanal** ($\\ce{C3H6O}$):\n\n- **Tollen's reagent**: both are aldehydes → both give silver mirror → cannot distinguish them (same result)\n- **Boiling point**: ethanal bp 20°C, propanal bp 49°C → **can** distinguish ✓\n- **Molecular mass**: $M_r$ ethanal = 44, propanal = 58 → **can** distinguish ✓\n- **Empirical formula**: ethanal $\\ce{C2H4O}$ → simplest ratio = **$\\ce{CH2O}$**; propanal $\\ce{C3H6O}$ → simplest ratio = **$\\ce{CH2O}$** → **same empirical formula** → **cannot** distinguish ✗\n\n**Empirical formula determination** cannot differentiate members of the same homologous series."
+          "correct": 0,
+          "explanation": "**Ethanal** ($\\ce{C2H4O}$) vs **propanal** ($\\ce{C3H6O}$):\n\n- **Tollen's reagent**: both are aldehydes → both give silver mirror → cannot distinguish them (same result)\n- **Boiling point**: ethanal bp 20°C, propanal bp 49°C → **can** distinguish ✓\n- **Molecular mass**: $M_r$ ethanal = 44, propanal = 58 → **can** distinguish ✓\n- **Empirical formula**: ethanal $\\ce{C2H4O}$ → simplest ratio = **$\\ce{CH2O}$**; propanal $\\ce{C3H6O}$ → simplest ratio = **$\\ce{CH2O}$** → **same empirical formula** → **cannot** distinguish ✗\n\n**Empirical formula determination** cannot differentiate members of the same homologous series.\n However, combustion analysis is used experimentally to determine empirical formula and there is a distinguishable step in terms of percentage of each atom in the respective molecule. \n Only the final mathematical simplification shows that the empirical formula is the same for both compounds."
         },
         {
           "question": "Which of the following statements is true for the nitration of benzene?",
