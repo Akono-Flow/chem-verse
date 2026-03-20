@@ -489,49 +489,66 @@ function renderTopicContent(id){
    BLOCK RENDERER
 ================================================================ */
 function renderBlocks(blocks){return (blocks||[]).map(renderBlock).join('');}
+
+// Parse markdown safely while preserving LaTeX/mhchem delimiters.
+// Math regions are swapped for unique placeholders before marked runs,
+// then restored afterwards so renderMathInElement can process them.
+function mdParse(src){
+  if(!src)return '';
+  const stash=[];
+  function stashIt(s){const k='\x00M'+stash.length+'\x00';stash.push(s);return k;}
+  // Protect display math first (longer patterns before shorter)
+  let s=src
+    .replace(/\$\$[\s\S]+?\$\$/g, m=>stashIt(m))
+    .replace(/\\\[[\s\S]+?\\\]/g,  m=>stashIt(m))
+    .replace(/\\\([\s\S]+?\\\)/g,  m=>stashIt(m))
+    .replace(/\$[^\s$][^$\n]*?\$/g,m=>stashIt(m));  // inline $...$
+  // Run marked - use parseSync (marked v5+) or fall back to parse
+  let html='';
+  try{
+    html=(typeof marked.parseSync==='function')
+      ? marked.parseSync(s)
+      : String(marked.parse(s));  // old versions return string synchronously
+  }catch(e){html=s;}
+  // Restore math placeholders
+  stash.forEach((orig,i)=>{html=html.split('\x00M'+i+'\x00').join(orig);});
+  return html;
+}
+
 function renderBlock(b){
   if(!b)return '';
   switch(b.type){
     case 'heading':{
       const lv=Math.min(Math.max(b.metadata?.level||2,2),4);
-      return `<h${lv} class="cv-h${lv}">${b.content||''}</h${lv}>`;
+      return '<h'+lv+' class="cv-h'+lv+'">'+(b.content||'')+'</h'+lv+'>';
     }
-    case 'text':{
-      let html=b.content||'';
-      try{html=marked.parse(html);}catch(e){}
-      return `<div class="cv-text">${html}</div>`;
-    }
+    case 'text':
+      return '<div class="cv-text">'+mdParse(b.content||'')+'</div>';
     case 'equation':
-      return `<div class="cv-equation">$$${b.content||''}$$</div>`;
+      return '<div class="cv-equation">$$'+(b.content||'')+'$$</div>';
     case 'callout':{
       const v=b.metadata?.variant||'info',tt=b.metadata?.title||'';
-      return `<div class="cv-callout ${v}">${tt?`<div class="callout-title">${esc(tt)}</div>`:''}${b.content||''}</div>`;
+      return '<div class="cv-callout '+v+'">'+(tt?'<div class="callout-title">'+esc(tt)+'</div>':'')+mdParse(b.content||'')+'</div>';
     }
     case 'list':{
       const items=(b.content||'').split('\n').filter(x=>x.trim());
       const tag=b.metadata?.ordered?'ol':'ul';
-      return `<${tag} class="cv-list">${items.map(i=>`<li>${i}</li>`).join('')}</${tag}>`;
+      return '<'+tag+' class="cv-list">'+items.map(i=>'<li>'+mdParse(i)+'</li>').join('')+'</'+tag+'>';
     }
     case 'table':{
       const rows=Array.isArray(b.content)?b.content:[];
       if(!rows.length)return '';
       const[hdrs,...drows]=rows;
-      return `<div class="cv-table-wrap"><table class="cv-table">
-        <thead><tr>${hdrs.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
-        <tbody>${drows.map(r=>`<tr>${r.map(c=>`<td>${esc(String(c||''))}</td>`).join('')}</tr>`).join('')}</tbody>
-      </table></div>`;
+      return '<div class="cv-table-wrap"><table class="cv-table"><thead><tr>'+hdrs.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+drows.map(r=>'<tr>'+r.map(c=>'<td>'+esc(String(c||''))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
     }
     case 'image':{
       const src=b.metadata?.dataUrl||'',cap=b.metadata?.caption||'';
       if(!src)return '';
-      return `<figure class="cv-image"><img src="${src}" alt="${esc(cap)}">${cap?`<figcaption>${esc(cap)}</figcaption>`:''}</figure>`;
+      return '<figure class="cv-image"><img src="'+src+'" alt="'+esc(cap)+'">'+(cap?'<figcaption>'+esc(cap)+'</figcaption>':'')+'</figure>';
     }
     case 'divider':return '<hr class="cv-divider">';
-    default:{
-      let html=b.content||'';
-      try{html=marked.parse(html);}catch(e){}
-      return `<div class="cv-text">${html}</div>`;
-    }
+    default:
+      return '<div class="cv-text">'+mdParse(b.content||'')+'</div>';
   }
 }
 
@@ -759,20 +776,20 @@ function renderQCard(q,answered,mode){
   if(q.questionGroup){
     const qg=q.questionGroup;
     let html=`<div class="q-card">`;
-    if(qg.context)html+=`<div class="q-context">${esc(qg.context)}</div>`;
+    if(qg.context)html+=`<div class="q-context">${qg.context}</div>`;
     if(qg.referenceTable)html+=renderRefTable(qg.referenceTable);
     html+=`<div style="display:flex;flex-direction:column;gap:1rem">`;
     qg.questions.forEach((sq,si)=>{
       const sqAns=answered?.[si]??null;
       html+=`<div class="subq-block">
         <div class="subq-num">Question ${sq.questionNumber||si+1}</div>
-        <div class="q-text">${esc(sq.question||'')}</div>
+        <div class="q-text">${sq.question||''}</div>
         <div class="opts">`;
       (sq.options||[]).forEach((o,oi)=>{
         let cls='';
         if(sqAns!==null){cls=oi===sq.correct?'correct':(oi===sqAns?'wrong':'');}
         html+=`<button class="opt-btn ${cls}" ${sqAns!==null?'disabled':''} onclick="${fn}_sub(${si},${oi})">
-          <span class="opt-lbl">${'ABCD'[oi]}</span><span>${esc(String(o))}</span>
+          <span class="opt-lbl">${'ABCD'[oi]}</span><span>${o||''}</span>
         </button>`;
       });
       html+=`</div>`;
@@ -785,7 +802,7 @@ function renderQCard(q,answered,mode){
 
   let html=`<div class="q-card">`;
   if(q.referenceTable)html+=renderRefTable(q.referenceTable);
-  html+=`<div class="q-text">${esc(q.question||'')}</div>`;
+  html+=`<div class="q-text">${q.question||''}</div>`;
   if(q.image)html+=`<img class="q-image" src="${q.image}" alt="Question image">`;
 
   // Table options
@@ -812,7 +829,7 @@ function renderQCard(q,answered,mode){
       const optImg=q.optionImages?.[oi];
       html+=`<button class="opt-btn ${cls}" ${answered!==null?'disabled':''} onclick="${fn}(${oi})">
         <span class="opt-lbl">${'ABCD'[oi]||oi}</span>
-        <span>${optImg?`<img src="${optImg}" style="max-height:60px;border-radius:4px">`:esc(String(o||''))}</span>
+        <span>${optImg?`<img src="${optImg}" style="max-height:60px;border-radius:4px">`:String(o||'')}</span>
       </button>`;
     });
     html+=`</div>`;
