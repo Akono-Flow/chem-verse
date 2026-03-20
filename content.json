@@ -3610,7 +3610,7 @@
           "explanation": "Following the sequence:\n\n**$\\ce{NO2}$ → [X] → O atoms**: $\\ce{NO2}$ is photodissociated by **sunlight (UV)**: $\\ce{NO2 + h\\nu -> NO + O}$ → **X = sunlight** ✓\n\n**O atoms → [Y] → OH radicals**: Oxygen atoms react with water vapour: $\\ce{O + H2O -> 2OH•}$ → **Y = water** ✓\n\n**OH radicals → [Z] → PAN**: OH• radicals react with **hydrocarbons** (VOCs from vehicle exhaust): $\\ce{OH• + RH -> R• + H2O}$ → these organic radicals eventually form PAN → **Z = hydrocarbons** ✓\n\n**X = sunlight, Y = water, Z = hydrocarbons**"
         },
         {
-          "question": "Item 44 refers to the following diagram which is a simplified version of the nitrogen cycle with four components labelled L, M, N and O.diagram with components labelled L, M, N and O. Which of the following options represents L, M, N and O?",
+          "question": "Item 44 refers to the following diagram which is a simplified version of the nitrogen cycle with four components labelled L, M, N and O. Which of the following options represents L, M, N and O?",
           "options": [
             "L = Reduction, M = Nitrogen-Fixing Bacteria, N = Nitrogen Oxides, O = Denitrifying Bacteria",
             "L = Oxidation, M = Denitrifying Bacteria, N = Nitrogen Oxides, O = Nitrogen-Fixing Bacteria",
