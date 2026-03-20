@@ -657,6 +657,7 @@ function renderBlock(b){
    PRACTICE MODE
 ================================================================ */
 function renderPractice(){
+  if(appState.practice?.ended)return renderPracticeResults();
   if(appState.practice)return renderPracticeQ();
   const topics=sortedTopics().filter(([,t])=>t.practice?.length>0);
   if(!topics.length)return `
@@ -791,19 +792,23 @@ function endPracticeEarly(){
 
 function finishPractice(){
   const p=appState.practice;
+  if(!p)return;
   const done=p.answered.filter(a=>a!==null).length;
   if(done===0){showToast('Answer at least one question first','error');return;}
   if(done<p.qs.length){
     if(!confirm(`You have answered ${done} of ${p.qs.length} questions.\nUnanswered questions will be marked as incorrect.\n\nFinish and see results?`))return;
   }
-  renderPracticeResults();
+  recordStats(p.topicId,p.correct,p.qs.length,'Practice');
+  p.ended=true;
+  renderMain();
 }
 
 function renderPracticeResults(){
   const p=appState.practice;
+  if(!p)return renderPractice();
   const pct=Math.round(p.correct/p.qs.length*100);
   const t=appData.topics[p.topicId];
-  recordStats(p.topicId,p.correct,p.qs.length,'Practice');
+  const answeredCount=p.answered.filter(a=>a!==null).length;
   const missed=p.qs.map((q,i)=>({q,chosen:p.answered[i],correct:p.answered[i]===q.correct}));
   const reviewHTML=missed.filter(x=>!x.correct).slice(0,10).map((x,i)=>`
     <div class="review-item">
@@ -812,19 +817,15 @@ function renderPracticeResults(){
       <div class="review-ans">✓ Correct answer: ${optLabel(x.q,x.q.correct)}</div>
       ${x.q.explanation?`<div class="review-exp">${mdParse(x.q.explanation)}</div>`:''}
     </div>`).join('');
-  const answeredCount=p.answered.filter(a=>a!==null).length;
-  // Replace practice state with null so re-renders show results correctly
-  const snapshot={...p};
-  appState.practice=null;
   return `<div class="result-screen">
     <div class="result-icon">${pct>=75?'🎉':pct>=50?'📈':'💪'}</div>
     <div class="result-topic">${esc(t?.title||'')}</div>
     <div class="result-pct">${pct}%</div>
     <div class="result-grade">${gradeLabel(pct)}</div>
-    <div class="result-sub">${snapshot.correct} correct · ${snapshot.wrong} wrong · ${snapshot.qs.length-answeredCount} skipped</div>
+    <div class="result-sub">${p.correct} correct · ${p.wrong} wrong · ${p.qs.length-answeredCount} skipped</div>
     <div class="result-actions">
-      <button class="btn btn-accent" onclick="startPractice('${eA(snapshot.topicId)}')">Try Again</button>
-      <button class="btn btn-ghost" onclick="setView('practice')">← Topics</button>
+      <button class="btn btn-accent" onclick="appState.practice=null;startPractice('${eA(p.topicId)}')">Try Again</button>
+      <button class="btn btn-ghost" onclick="appState.practice=null;setView('practice')">← Topics</button>
     </div>
     ${missed.some(x=>!x.correct)?`<div style="text-align:left;margin-top:1rem"><strong style="font-size:.88rem;color:var(--text2)">Missed Questions (review):</strong><div style="margin-top:.75rem">${reviewHTML}</div></div>`:''}
   </div>`;
