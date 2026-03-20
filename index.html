@@ -100,6 +100,18 @@ hr.cv-divider{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
 .q-context{background:var(--bg3);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:1rem;font-size:.88rem;color:var(--text2);border-left:3px solid var(--info)}
 .q-text{font-size:1rem;line-height:1.6;margin-bottom:1.25rem;white-space:pre-wrap}
 .q-image{max-width:100%;border-radius:var(--radius);margin-bottom:1rem;display:block}
+/* Image upload UI */
+.img-upload-zone{display:flex;align-items:center;gap:.6rem;margin-top:.5rem}
+.img-upload-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .75rem;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:.78rem;font-weight:600;color:var(--text2);transition:all .15s;white-space:nowrap}
+.img-upload-btn:hover{border-color:var(--accent);color:var(--accent)}
+.img-preview-wrap{display:flex;align-items:center;gap:.5rem;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:.3rem .5rem}
+.img-preview-wrap img{max-height:52px;max-width:120px;border-radius:4px;display:block}
+.img-remove-btn{width:20px;height:20px;border-radius:50%;background:var(--danger);border:none;color:white;font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
+.img-remove-btn:hover{opacity:.8}
+.opt-img-thumb{max-height:38px;max-width:80px;border-radius:3px;display:block}
+.opt-img-btn{padding:.2rem .45rem;font-size:.7rem;background:var(--bg4);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text2);transition:all .12s;white-space:nowrap;flex-shrink:0}
+.opt-img-btn:hover{border-color:var(--accent);color:var(--accent)}
+.opt-img-has{border-color:var(--success)!important;color:var(--success)!important}
 .opts{display:flex;flex-direction:column;gap:.55rem}
 .opt-btn{display:flex;align-items:center;gap:.85rem;background:var(--bg3);border:2px solid transparent;border-radius:var(--radius);padding:.75rem 1rem;text-align:left;cursor:pointer;font-family:inherit;font-size:.9rem;color:var(--text);transition:all .15s}
 .opt-btn:hover:not(:disabled){border-color:var(--accent);background:var(--bg4)}
@@ -792,14 +804,16 @@ function renderQCard(q,answered,mode){
     const qg=q.questionGroup;
     let html=`<div class="q-card">`;
     if(qg.context)html+=`<div class="q-context">${qg.context}</div>`;
+    if(qg.contextImage)html+=`<img class="q-image" src="${qg.contextImage}" alt="Context image" style="margin-bottom:1rem">`;
     if(qg.referenceTable)html+=renderRefTable(qg.referenceTable);
     html+=`<div style="display:flex;flex-direction:column;gap:1rem">`;
     qg.questions.forEach((sq,si)=>{
       const sqAns=answered?.[si]??null;
       html+=`<div class="subq-block">
         <div class="subq-num">Question ${sq.questionNumber||si+1}</div>
-        <div class="q-text">${sq.question||''}</div>
-        <div class="opts">`;
+        <div class="q-text">${sq.question||''}</div>`;
+      if(sq.image)html+=`<img class="q-image" src="${sq.image}" alt="Question image" style="margin-bottom:.75rem">`;
+      html+=`<div class="opts">`;
       (sq.options||[]).forEach((o,oi)=>{
         let cls='';
         if(sqAns!==null){cls=oi===sq.correct?'correct':(oi===sqAns?'wrong':'');}
@@ -1432,13 +1446,109 @@ function previewContent(topicId){
 }
 
 /* ================================================================
+   IMAGE HELPERS
+================================================================ */
+// Open a file picker, read as base64, store in a hidden input, show preview.
+// dataId  = id of hidden <input> that stores the base64 string
+// previewWrapperId = id of the preview container div
+function pickImage(dataId, previewWrapperId){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.onchange=e=>{
+    const file=e.target.files?.[0]; if(!file)return;
+    // Warn if file is large (> 400 KB raw → ~530 KB base64)
+    if(file.size>400*1024){
+      if(!confirm(`This image is ${Math.round(file.size/1024)} KB. Large images increase content.json size significantly.\n\nContinue anyway?`))return;
+    }
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const dataUrl=ev.target.result;
+      const hiddenInput=document.getElementById(dataId);
+      if(hiddenInput)hiddenInput.value=dataUrl;
+      _showImgPreview(dataUrl, previewWrapperId, dataId);
+    };
+    reader.readAsDataURL(file);
+  };
+  inp.click();
+}
+
+function _showImgPreview(dataUrl, previewWrapperId, dataId){
+  const wrap=document.getElementById(previewWrapperId);
+  if(!wrap)return;
+  wrap.innerHTML=`
+    <div class="img-preview-wrap">
+      <img src="${dataUrl}" alt="preview">
+      <button class="img-remove-btn" onclick="_clearImg('${dataId}','${previewWrapperId}')" title="Remove image">✕</button>
+    </div>`;
+}
+
+function _clearImg(dataId, previewWrapperId){
+  const h=document.getElementById(dataId); if(h)h.value='';
+  const w=document.getElementById(previewWrapperId); if(w)w.innerHTML='';
+  // Update option image button style if this is an option image
+  const m=dataId.match(/^qf-opt-img-(\d+)$/);
+  if(m)_updateOptImgBtn(parseInt(m[1]),false);
+}
+
+// Pick image specifically for an option (also updates the button style)
+function pickOptImage(optIdx){
+  const dataId=`qf-opt-img-${optIdx}`;
+  const previewId=`qf-opt-img-preview-${optIdx}`;
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.onchange=e=>{
+    const file=e.target.files?.[0]; if(!file)return;
+    if(file.size>400*1024){
+      if(!confirm(`This image is ${Math.round(file.size/1024)} KB. Large images increase content.json size.\n\nContinue anyway?`))return;
+    }
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const dataUrl=ev.target.result;
+      const h=document.getElementById(dataId); if(h)h.value=dataUrl;
+      _updateOptImgBtn(optIdx, true);
+      const pw=document.getElementById(previewId);
+      if(pw)pw.innerHTML=`<img class="opt-img-thumb" src="${dataUrl}" alt="opt ${optIdx}">
+        <button class="img-remove-btn" style="width:16px;height:16px;font-size:.55rem" onclick="_clearImg('${dataId}','${previewId}');_updateOptImgBtn(${optIdx},false)" title="Remove">✕</button>`;
+    };
+    reader.readAsDataURL(file);
+  };
+  inp.click();
+}
+
+function _updateOptImgBtn(optIdx, hasImg){
+  const btn=document.getElementById(`qf-opt-img-btn-${optIdx}`);
+  if(!btn)return;
+  if(hasImg){btn.textContent='🖼 Change';btn.classList.add('opt-img-has');}
+  else{btn.textContent='📷 Image';btn.classList.remove('opt-img-has');}
+}
+
+// Restore image previews when editing an existing question
+function _restoreImgPreviews(q){
+  if(q.image)_showImgPreview(q.image,'qf-img-preview','qf-img-data');
+  if(Array.isArray(q.optionImages)){
+    q.optionImages.forEach((img,i)=>{
+      if(!img)return;
+      const h=document.getElementById(`qf-opt-img-${i}`); if(h)h.value=img;
+      _updateOptImgBtn(i,true);
+      const pw=document.getElementById(`qf-opt-img-preview-${i}`);
+      if(pw)pw.innerHTML=`<img class="opt-img-thumb" src="${img}" alt="opt ${i}">
+        <button class="img-remove-btn" style="width:16px;height:16px;font-size:.55rem" onclick="_clearImg('qf-opt-img-${i}','qf-opt-img-preview-${i}');_updateOptImgBtn(${i},false)" title="Remove">✕</button>`;
+    });
+  }
+}
+
+function _restoreSubQImgPreview(q, si){
+  if(q.image)_showImgPreview(q.image,`lq-img-preview-${si}`,`lq-img-data-${si}`);
+}
+
+/* ================================================================
    QUESTION EDITOR
 ================================================================ */
 function showAddQuestionModal(topicId){
   openModal({title:'Select Question Type',size:'',body:`
     <div class="type-grid">
       ${[
-        {type:'standard',   name:'Standard MCQ',    desc:'Text question, 4 text options'},
+        {type:'standard',   name:'Standard MCQ',    desc:'Text question, 4 options — supports images in question and options'},
         {type:'list-combo', name:'List Combination', desc:'Numbered items → combo options (I and II only…)'},
         {type:'table-opt',  name:'Table Options',    desc:'Options presented as a table with column headers'},
         {type:'linked',     name:'Linked Questions', desc:'Shared preamble with multiple sub-questions'},
@@ -1458,14 +1568,23 @@ function openQuestionForm(topicId, qtype, editIdx){
   if(qtype==='standard'){
     const q=existing||{question:'',options:['','','',''],correct:0,explanation:''};
     body=`
-      <div class="form-group"><label class="form-label">Question Text <span class="form-hint" style="display:inline">— LaTeX supported ($...$)</span></label>
-        <textarea class="form-control" id="qf-text" style="min-height:90px">${esc(q.question||'')}</textarea></div>
-      <div class="form-group"><label class="form-label">Options — select correct answer (●)</label>
+      <div class="form-group"><label class="form-label">Question Text <span class="form-hint" style="display:inline">— LaTeX ($...$) and Markdown supported</span></label>
+        <textarea class="form-control" id="qf-text" style="min-height:90px">${esc(q.question||'')}</textarea>
+        <div class="img-upload-zone">
+          <button type="button" class="img-upload-btn" onclick="pickImage('qf-img-data','qf-img-preview')">📷 Add Question Image</button>
+          <div id="qf-img-preview"></div>
+        </div>
+        <input type="hidden" id="qf-img-data" value="">
+      </div>
+      <div class="form-group"><label class="form-label">Options — select correct answer (●) · use 📷 to add an image option</label>
         ${['A','B','C','D'].map((l,i)=>`
-        <div class="opt-row">
-          <input type="radio" name="qf-correct" value="${i}" ${(q.correct===i)?'checked':''}>
-          <span class="opt-ltr">${l}</span>
-          <input class="form-control" id="qf-opt-${i}" value="${esc(String(q.options?.[i]||''))}" placeholder="Option ${l}">
+        <div class="opt-row" style="align-items:flex-start;flex-wrap:wrap;gap:.4rem">
+          <input type="radio" name="qf-correct" value="${i}" ${(q.correct===i)?'checked':''} style="margin-top:.55rem">
+          <span class="opt-ltr" style="margin-top:.55rem">${l}</span>
+          <input class="form-control" id="qf-opt-${i}" value="${esc(String(q.options?.[i]||''))}" placeholder="Option ${l} text (leave blank if using image only)" style="flex:1;min-width:120px">
+          <button type="button" class="opt-img-btn" id="qf-opt-img-btn-${i}" onclick="pickOptImage(${i})">📷 Image</button>
+          <input type="hidden" id="qf-opt-img-${i}" value="">
+          <div id="qf-opt-img-preview-${i}" style="display:flex;align-items:center;gap:.35rem;width:100%;padding-left:2.4rem"></div>
         </div>`).join('')}
       </div>
       <div class="form-group"><label class="form-label">Explanation (optional)</label>
@@ -1527,7 +1646,13 @@ function openQuestionForm(topicId, qtype, editIdx){
       <div class="form-group"><label class="form-label">Group Label (optional)</label>
         <input class="form-control" id="lq-label" value="${esc(q.groupLabel||'')}"></div>
       <div class="form-group"><label class="form-label">Shared Context / Preamble</label>
-        <textarea class="form-control" id="lq-context" style="min-height:90px">${esc(q.context||'')}</textarea></div>
+        <textarea class="form-control" id="lq-context" style="min-height:90px">${esc(q.context||'')}</textarea>
+        <div class="img-upload-zone">
+          <button type="button" class="img-upload-btn" onclick="pickImage('lq-context-img-data','lq-context-img-preview')">📷 Add Context Image</button>
+          <div id="lq-context-img-preview"></div>
+        </div>
+        <input type="hidden" id="lq-context-img-data" value="">
+      </div>
       <div id="lq-subs-wrap">
         ${subs.map((sq,si)=>renderSubQForm(sq,si)).join('')}
       </div>
@@ -1538,6 +1663,19 @@ function openQuestionForm(topicId, qtype, editIdx){
     buttons:[{label:'Cancel',cls:'btn-ghost',fn:'closeModal()'},
              {label:isEdit?'Save Changes':'Add Question',cls:'btn-accent',
               fn:`saveQuestion('${eA(topicId)}','${qtype}',${isEdit?editIdx:'null'})`}]});
+
+  // Restore image previews when editing an existing question
+  if(isEdit&&existing){
+    setTimeout(()=>{
+      if(qtype==='standard'){
+        _restoreImgPreviews(existing);
+      } else if(qtype==='linked'&&existing.questionGroup){
+        const cImg=existing.questionGroup.contextImage;
+        if(cImg)_showImgPreview(cImg,'lq-context-img-preview','lq-context-img-data');
+        (existing.questionGroup.questions||[]).forEach((sq,si)=>_restoreSubQImgPreview(sq,si));
+      }
+    },50);
+  }
 }
 
 function renderSubQForm(sq,si){
@@ -1546,7 +1684,13 @@ function renderSubQForm(sq,si){
       ${si>0?`<button class="btn btn-danger btn-icon btn-sm" style="width:20px;height:20px;font-size:.65rem;float:right" onclick="this.closest('.subq-block').remove()">✕</button>`:''}
     </div>
     <div class="form-group"><label class="form-label">Question</label>
-      <textarea class="form-control" id="lq-sq-${si}" style="min-height:60px">${esc(sq.question||'')}</textarea></div>
+      <textarea class="form-control" id="lq-sq-${si}" style="min-height:60px">${esc(sq.question||'')}</textarea>
+      <div class="img-upload-zone">
+        <button type="button" class="img-upload-btn" onclick="pickImage('lq-img-data-${si}','lq-img-preview-${si}')">📷 Add Image</button>
+        <div id="lq-img-preview-${si}"></div>
+      </div>
+      <input type="hidden" id="lq-img-data-${si}" value="">
+    </div>
     <div class="form-group"><label class="form-label">Options (mark correct ●)</label>
       ${['A','B','C','D'].map((l,oi)=>`
       <div class="opt-row">
@@ -1651,8 +1795,16 @@ function saveQuestion(topicId, qtype, editIdx){
   if(qtype==='standard'){
     const opts=['A','B','C','D'].map((_,i)=>gc(`qf-opt-${i}`));
     const correct=parseInt(document.querySelector('input[name="qf-correct"]:checked')?.value??0);
-    if(!gc('qf-text')||opts.some(o=>!o)){showToast('Fill in question and all options','error');return;}
+    if(!gc('qf-text')||opts.some((o,i)=>!o&&!document.getElementById(`qf-opt-img-${i}`)?.value)){
+      showToast('Fill in question and all options (text or image for each)','error');return;
+    }
     q={question:gc('qf-text'),options:opts,correct,explanation:gc('qf-expl')};
+    // Question image
+    const imgData=document.getElementById('qf-img-data')?.value||'';
+    if(imgData)q.image=imgData;
+    // Option images — only save if at least one has an image
+    const optImgs=['A','B','C','D'].map((_,i)=>document.getElementById(`qf-opt-img-${i}`)?.value||null);
+    if(optImgs.some(Boolean))q.optionImages=optImgs;
     const rt=collectRefTable();if(rt)q.referenceTable=rt;
   }
   else if(qtype==='list-combo'){
@@ -1683,11 +1835,17 @@ function saveQuestion(topicId, qtype, editIdx){
     const questions=subs.map((blk,si)=>{
       const opts=['A','B','C','D'].map((_,oi)=>document.getElementById(`lq-opt-${si}-${oi}`)?.value?.trim()||'');
       const correct=parseInt(blk.querySelector(`input[name="lq-correct-${si}"]:checked`)?.value??0);
-      return{questionNumber:si+1,question:document.getElementById(`lq-sq-${si}`)?.value?.trim()||'',
+      const subQ={questionNumber:si+1,question:document.getElementById(`lq-sq-${si}`)?.value?.trim()||'',
         options:opts,correct,explanation:document.getElementById(`lq-expl-${si}`)?.value?.trim()||''};
+      const subImg=document.getElementById(`lq-img-data-${si}`)?.value||'';
+      if(subImg)subQ.image=subImg;
+      return subQ;
     });
     if(!gc('lq-context')||!questions.length){showToast('Context and at least one sub-question required','error');return;}
-    q={questionGroup:{groupLabel:gc('lq-label'),context:gc('lq-context'),questions}};
+    const grp={groupLabel:gc('lq-label'),context:gc('lq-context'),questions};
+    const ctxImg=document.getElementById('lq-context-img-data')?.value||'';
+    if(ctxImg)grp.contextImage=ctxImg;
+    q={questionGroup:grp};
   }
 
   if(!q){showToast('Could not save question','error');return;}
