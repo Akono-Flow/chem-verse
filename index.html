@@ -622,7 +622,7 @@ function renderPracticeResults(){
       <div class="review-meta">Question ${i+1} — Incorrect</div>
       <div class="review-q">${esc(x.q.question?.substring(0,120)||'')}</div>
       <div class="review-ans">✓ Correct answer: ${optLabel(x.q,x.q.correct)}</div>
-      ${x.q.explanation?`<div class="review-exp">${esc(x.q.explanation)}</div>`:''}
+      ${x.q.explanation?`<div class="review-exp">${mdParse(x.q.explanation)}</div>`:''}
     </div>`).join('');
   return `<div class="result-screen">
     <div class="result-icon">${pct>=75?'🎉':pct>=50?'📈':'💪'}</div>
@@ -748,7 +748,7 @@ function renderQuizResults(){
       <div class="review-meta">${x.chosen===null?'Skipped':'Incorrect'}</div>
       <div class="review-q">${esc(x.q.question?.substring(0,120)||'')}</div>
       <div class="review-ans">✓ ${optLabel(x.q,x.q.correct)}</div>
-      ${x.q.explanation?`<div class="review-exp">${esc(x.q.explanation)}</div>`:''}
+      ${x.q.explanation?`<div class="review-exp">${mdParse(x.q.explanation)}</div>`:''}
     </div>`).join('');
   return `<div class="result-screen">
     <div class="result-icon">${pct>=75?'🏆':pct>=50?'📈':'💪'}</div>
@@ -793,7 +793,7 @@ function renderQCard(q,answered,mode){
         </button>`;
       });
       html+=`</div>`;
-      if(sqAns!==null&&sq.explanation)html+=`<div class="q-explanation"><strong>Explanation</strong>${esc(sq.explanation)}</div>`;
+      if(sqAns!==null&&sq.explanation)html+=`<div class="q-explanation"><strong>Explanation</strong>${mdParse(sq.explanation)}</div>`;
       html+=`</div>`;
     });
     html+=`</div></div>`;
@@ -836,7 +836,7 @@ function renderQCard(q,answered,mode){
   }
 
   if(answered!==null&&q.explanation)
-    html+=`<div class="q-explanation"><strong>Explanation</strong>${esc(q.explanation)}</div>`;
+    html+=`<div class="q-explanation"><strong>Explanation</strong>${mdParse(q.explanation)}</div>`;
   html+=`</div>`;
   return html;
 }
