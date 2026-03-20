@@ -98,7 +98,30 @@ hr.cv-divider{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
 .q-score{display:flex;gap:.75rem}.q-score span{font-weight:700}.q-score .cor{color:var(--success)}.q-score .wrg{color:var(--danger)}
 .q-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1rem}
 .q-context{background:var(--bg3);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:1rem;font-size:.88rem;color:var(--text2);border-left:3px solid var(--info)}
-.q-text{font-size:1rem;line-height:1.6;margin-bottom:1.25rem;white-space:pre-wrap}
+.q-text{font-size:1rem;line-height:1.6;margin-bottom:1.25rem}
+/* Tables rendered inside question stems via Markdown */
+.q-text table{width:100%;border-collapse:collapse;font-size:.88rem;margin:.6rem 0}
+.q-text th,.q-text td{padding:.45rem .7rem;border:1px solid var(--border);text-align:left}
+.q-text th{background:var(--bg3);font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+.q-text tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+/* Textarea toolbar */
+.qf-toolbar{display:flex;gap:.35rem;margin-bottom:.3rem;flex-wrap:wrap}
+.qf-toolbar-btn{display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .6rem;background:var(--bg3);border:1px solid var(--border);border-radius:4px;font-size:.75rem;font-weight:600;color:var(--text2);cursor:pointer;transition:all .12s;font-family:inherit}
+.qf-toolbar-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--bg4)}
+/* Floating table builder panel */
+#tbl-builder-panel{position:fixed;z-index:600;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);padding:1rem 1.1rem;min-width:340px;max-width:92vw;max-height:85vh;overflow-y:auto;display:none}
+#tbl-builder-panel.open{display:block}
+.tbl-bld-title{font-weight:700;font-size:.88rem;margin-bottom:.75rem;display:flex;align-items:center;justify-content:space-between}
+.tbl-bld-controls{display:flex;align-items:center;gap:.65rem;margin-bottom:.8rem;flex-wrap:wrap}
+.tbl-bld-controls label{font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.tbl-bld-controls input[type=number]{width:52px;padding:.3rem .45rem;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:.85rem;text-align:center}
+.tbl-bld-grid{overflow-x:auto;margin-bottom:.8rem}
+.tbl-bld-grid table{border-collapse:collapse}
+.tbl-bld-grid td{padding:2px}
+.tbl-bld-grid input{width:90px;min-width:60px;padding:.3rem .4rem;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:inherit;font-size:.8rem}
+.tbl-bld-grid input:focus{outline:none;border-color:var(--accent)}
+.tbl-bld-grid .hdr-cell input{background:var(--bg4);font-weight:700;border-color:var(--accent)}
+.tbl-bld-actions{display:flex;gap:.5rem;justify-content:flex-end}
 .q-image{max-width:100%;border-radius:var(--radius);margin-bottom:1rem;display:block}
 /* Image upload UI */
 .img-upload-zone{display:flex;align-items:center;gap:.6rem;margin-top:.5rem}
@@ -242,6 +265,26 @@ code{font-family:'IBM Plex Mono',monospace;font-size:.85em;background:var(--bg3)
   </div>
 </header>
 <div id="main-content"></div>
+
+<!-- Floating table builder panel (z-index above modal) -->
+<div id="tbl-builder-panel">
+  <div class="tbl-bld-title">
+    <span>⊞ Insert Table</span>
+    <button class="btn btn-ghost btn-icon btn-sm" onclick="closeTblBuilder()">✕</button>
+  </div>
+  <div class="tbl-bld-controls">
+    <label>Rows</label>
+    <input type="number" id="tbl-bld-rows" value="3" min="1" max="12" onchange="tblBldRebuild()">
+    <label>Columns</label>
+    <input type="number" id="tbl-bld-cols" value="3" min="1" max="8" onchange="tblBldRebuild()">
+    <span style="font-size:.72rem;color:var(--text2)">(first row = headers)</span>
+  </div>
+  <div class="tbl-bld-grid" id="tbl-bld-grid"></div>
+  <div class="tbl-bld-actions">
+    <button class="btn btn-ghost btn-sm" onclick="closeTblBuilder()">Cancel</button>
+    <button class="btn btn-accent btn-sm" onclick="tblBldInsert()">Insert Table</button>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="modal-overlay" onclick="handleOverlayClick(event)">
   <div class="modal-box" id="modal-box">
     <div class="modal-head">
@@ -542,6 +585,14 @@ function mdParse(src){
   return html;
 }
 
+// Inline version — strips the wrapping <p>...</p> that marked adds.
+// Used for option text rendered inside <button> or <span> elements.
+function mdParseInline(src){
+  if(!src)return '';
+  const html=mdParse(src);
+  // Remove a single wrapping <p>...</p> if the whole output is one paragraph
+  return html.replace(/^<p>([\s\S]*?)<\/p>\n?$/,'$1');
+}
 function renderBlock(b){
   if(!b)return '';
   switch(b.type){
@@ -803,7 +854,7 @@ function renderQCard(q,answered,mode){
   if(q.questionGroup){
     const qg=q.questionGroup;
     let html=`<div class="q-card">`;
-    if(qg.context)html+=`<div class="q-context">${qg.context}</div>`;
+    if(qg.context)html+=`<div class="q-context q-text">${mdParse(qg.context)}</div>`;
     if(qg.contextImage)html+=`<img class="q-image" src="${qg.contextImage}" alt="Context image" style="margin-bottom:1rem">`;
     if(qg.referenceTable)html+=renderRefTable(qg.referenceTable);
     html+=`<div style="display:flex;flex-direction:column;gap:1rem">`;
@@ -811,14 +862,14 @@ function renderQCard(q,answered,mode){
       const sqAns=answered?.[si]??null;
       html+=`<div class="subq-block">
         <div class="subq-num">Question ${sq.questionNumber||si+1}</div>
-        <div class="q-text">${sq.question||''}</div>`;
+        <div class="q-text">${mdParse(sq.question||'')}</div>`;
       if(sq.image)html+=`<img class="q-image" src="${sq.image}" alt="Question image" style="margin-bottom:.75rem">`;
       html+=`<div class="opts">`;
       (sq.options||[]).forEach((o,oi)=>{
         let cls='';
         if(sqAns!==null){cls=oi===sq.correct?'correct':(oi===sqAns?'wrong':'');}
         html+=`<button class="opt-btn ${cls}" ${sqAns!==null?'disabled':''} onclick="${fn}_sub(${si},${oi})">
-          <span class="opt-lbl">${'ABCD'[oi]}</span><span>${o||''}</span>
+          <span class="opt-lbl">${'ABCD'[oi]}</span><span>${mdParseInline(o||'')}</span>
         </button>`;
       });
       html+=`</div>`;
@@ -831,7 +882,7 @@ function renderQCard(q,answered,mode){
 
   let html=`<div class="q-card">`;
   if(q.referenceTable)html+=renderRefTable(q.referenceTable);
-  html+=`<div class="q-text">${q.question||''}</div>`;
+  html+=`<div class="q-text">${mdParse(q.question||'')}</div>`;
   if(q.image)html+=`<img class="q-image" src="${q.image}" alt="Question image">`;
 
   // Table options
@@ -858,7 +909,7 @@ function renderQCard(q,answered,mode){
       const optImg=q.optionImages?.[oi];
       html+=`<button class="opt-btn ${cls}" ${answered!==null?'disabled':''} onclick="${fn}(${oi})">
         <span class="opt-lbl">${'ABCD'[oi]||oi}</span>
-        <span>${optImg?`<img src="${optImg}" style="max-height:60px;border-radius:4px">`:String(o||'')}</span>
+        <span>${optImg?`<img src="${optImg}" style="max-height:60px;border-radius:4px">`:mdParseInline(o||'')}</span>
       </button>`;
     });
     html+=`</div>`;
@@ -1446,6 +1497,127 @@ function previewContent(topicId){
 }
 
 /* ================================================================
+   TABLE BUILDER
+================================================================ */
+let _tblTarget=null; // id of the textarea to insert into
+
+function openTblBuilder(targetId, triggerEl){
+  _tblTarget=targetId;
+  const panel=document.getElementById('tbl-builder-panel');
+  // Position near the trigger button
+  const rect=triggerEl.getBoundingClientRect();
+  const panelW=360;
+  let left=rect.left;
+  let top=rect.bottom+6;
+  // Keep within viewport
+  if(left+panelW>window.innerWidth-12)left=window.innerWidth-panelW-12;
+  if(left<8)left=8;
+  // If too close to bottom, flip above
+  const panelMaxH=Math.min(480, window.innerHeight*0.75);
+  if(top+panelMaxH>window.innerHeight-12)top=rect.top-panelMaxH-6;
+  panel.style.left=left+'px';
+  panel.style.top=Math.max(8,top)+'px';
+  panel.classList.add('open');
+  // Reset to 3×3 and build grid
+  document.getElementById('tbl-bld-rows').value=3;
+  document.getElementById('tbl-bld-cols').value=3;
+  tblBldRebuild();
+  // Close when clicking outside
+  setTimeout(()=>document.addEventListener('mousedown',_tblOutsideClick,{once:true}),10);
+}
+
+function _tblOutsideClick(e){
+  const panel=document.getElementById('tbl-builder-panel');
+  if(panel&&!panel.contains(e.target)){
+    closeTblBuilder();
+  } else {
+    // Clicked inside — re-attach listener
+    setTimeout(()=>document.addEventListener('mousedown',_tblOutsideClick,{once:true}),10);
+  }
+}
+
+function closeTblBuilder(){
+  document.getElementById('tbl-builder-panel').classList.remove('open');
+  document.removeEventListener('mousedown',_tblOutsideClick);
+  _tblTarget=null;
+}
+
+function tblBldRebuild(){
+  const rows=Math.min(12,Math.max(1,parseInt(document.getElementById('tbl-bld-rows').value)||3));
+  const cols=Math.min(8, Math.max(1,parseInt(document.getElementById('tbl-bld-cols').value)||3));
+  const grid=document.getElementById('tbl-bld-grid');
+  // Preserve existing cell values before rebuilding
+  const prev={};
+  grid.querySelectorAll('input[data-r][data-c]').forEach(inp=>{
+    prev[`${inp.dataset.r}_${inp.dataset.c}`]=inp.value;
+  });
+  let html='<table><tbody>';
+  for(let r=0;r<rows;r++){
+    html+=`<tr>`;
+    for(let c=0;c<cols;c++){
+      const isHdr=r===0;
+      const val=prev[`${r}_${c}`]||'';
+      html+=`<td class="${isHdr?'hdr-cell':''}">
+        <input data-r="${r}" data-c="${c}"
+          placeholder="${isHdr?'Header':'Cell'} ${r+1}×${c+1}"
+          value="${val.replace(/"/g,'&quot;')}"
+          title="${isHdr?'Header row':'Data row'}">
+      </td>`;
+    }
+    html+=`</tr>`;
+  }
+  html+='</tbody></table>';
+  grid.innerHTML=html;
+}
+
+function tblBldInsert(){
+  if(!_tblTarget)return;
+  const ta=document.getElementById(_tblTarget);
+  if(!ta){closeTblBuilder();return;}
+  const rows=parseInt(document.getElementById('tbl-bld-rows').value)||3;
+  const cols=parseInt(document.getElementById('tbl-bld-cols').value)||3;
+  // Collect all cell values
+  const grid=document.getElementById('tbl-bld-grid');
+  const cells=[];
+  for(let r=0;r<rows;r++){
+    cells[r]=[];
+    for(let c=0;c<cols;c++){
+      const inp=grid.querySelector(`input[data-r="${r}"][data-c="${c}"]`);
+      // Escape pipe chars in cell content so Markdown table isn't broken
+      cells[r][c]=(inp?.value||'').replace(/\|/g,'\\|').trim()||' ';
+    }
+  }
+  // Build Markdown table
+  // Calculate column widths for alignment (minimum 3 for separator dashes)
+  const widths=Array.from({length:cols},(_,c)=>
+    Math.max(3,...cells.map(row=>row[c].length))
+  );
+  const pad=(s,w)=>s+' '.repeat(Math.max(0,w-s.length));
+  const rowToMd=row=>'| '+row.map((c,i)=>pad(c,widths[i])).join(' | ')+' |';
+  const separator='| '+widths.map(w=>'-'.repeat(w)).join(' | ')+' |';
+  const lines=[
+    rowToMd(cells[0]),   // header row
+    separator,           // separator row
+    ...cells.slice(1).map(rowToMd)  // data rows
+  ];
+  const mdTable='\n'+lines.join('\n')+'\n';
+  // Insert at cursor position or append
+  const start=ta.selectionStart??ta.value.length;
+  const end=ta.selectionEnd??ta.value.length;
+  // Ensure a blank line before the table if there's content before cursor
+  const before=ta.value.slice(0,start);
+  const after=ta.value.slice(end);
+  const prefix=(before&&!before.endsWith('\n\n'))?
+    (before.endsWith('\n')?'\n':'  \n\n') : '';
+  ta.value=before+prefix+mdTable+(after&&!after.startsWith('\n')?'\n':'')+after;
+  // Move cursor to after the inserted table
+  const newPos=before.length+prefix.length+mdTable.length;
+  ta.selectionStart=ta.selectionEnd=newPos;
+  ta.focus();
+  closeTblBuilder();
+}
+
+/* ================================================================
    IMAGE HELPERS
 ================================================================ */
 // Open a file picker, read as base64, store in a hidden input, show preview.
@@ -1541,6 +1713,14 @@ function _restoreSubQImgPreview(q, si){
   if(q.image)_showImgPreview(q.image,`lq-img-preview-${si}`,`lq-img-data-${si}`);
 }
 
+// Generates toolbar HTML for a question textarea.
+// targetId = the textarea's id; used by openTblBuilder.
+function qfToolbar(targetId){
+  return `<div class="qf-toolbar">
+    <button type="button" class="qf-toolbar-btn" onclick="openTblBuilder('${targetId}',this)" title="Insert a table into the question text">⊞ Table</button>
+  </div>`;
+}
+
 /* ================================================================
    QUESTION EDITOR
 ================================================================ */
@@ -1569,6 +1749,7 @@ function openQuestionForm(topicId, qtype, editIdx){
     const q=existing||{question:'',options:['','','',''],correct:0,explanation:''};
     body=`
       <div class="form-group"><label class="form-label">Question Text <span class="form-hint" style="display:inline">— LaTeX ($...$) and Markdown supported</span></label>
+        ${qfToolbar('qf-text')}
         <textarea class="form-control" id="qf-text" style="min-height:90px">${esc(q.question||'')}</textarea>
         <div class="img-upload-zone">
           <button type="button" class="img-upload-btn" onclick="pickImage('qf-img-data','qf-img-preview')">📷 Add Question Image</button>
@@ -1597,6 +1778,7 @@ function openQuestionForm(topicId, qtype, editIdx){
     const combos=q.combinations||[];
     body=`
       <div class="form-group"><label class="form-label">Stem (question text)</label>
+        ${qfToolbar('qf-text')}
         <textarea class="form-control" id="qf-text" style="min-height:70px">${esc(q.question||'')}</textarea></div>
       <div class="form-group"><label class="form-label">List Items (I, II, III…)</label>
         ${items.map((it,i)=>`<input class="form-control" id="lci-${i}" value="${esc(it)}" placeholder="Item ${['I','II','III','IV'][i]||i+1}" style="margin-bottom:.3rem">`).join('')}
@@ -1621,6 +1803,7 @@ function openQuestionForm(topicId, qtype, editIdx){
     const opts=to.options||[];
     body=`
       <div class="form-group"><label class="form-label">Question Text</label>
+        ${qfToolbar('qf-text')}
         <textarea class="form-control" id="qf-text" style="min-height:70px">${esc(q.question||'')}</textarea></div>
       <div class="form-group"><label class="form-label">Table Headers <span class="form-hint" style="display:inline">(comma-separated)</span></label>
         <input class="form-control" id="to-headers" value="${esc(hdrs.join(', '))}"></div>
@@ -1646,6 +1829,7 @@ function openQuestionForm(topicId, qtype, editIdx){
       <div class="form-group"><label class="form-label">Group Label (optional)</label>
         <input class="form-control" id="lq-label" value="${esc(q.groupLabel||'')}"></div>
       <div class="form-group"><label class="form-label">Shared Context / Preamble</label>
+        ${qfToolbar('lq-context')}
         <textarea class="form-control" id="lq-context" style="min-height:90px">${esc(q.context||'')}</textarea>
         <div class="img-upload-zone">
           <button type="button" class="img-upload-btn" onclick="pickImage('lq-context-img-data','lq-context-img-preview')">📷 Add Context Image</button>
@@ -1684,6 +1868,7 @@ function renderSubQForm(sq,si){
       ${si>0?`<button class="btn btn-danger btn-icon btn-sm" style="width:20px;height:20px;font-size:.65rem;float:right" onclick="this.closest('.subq-block').remove()">✕</button>`:''}
     </div>
     <div class="form-group"><label class="form-label">Question</label>
+      ${qfToolbar(`lq-sq-${si}`)}
       <textarea class="form-control" id="lq-sq-${si}" style="min-height:60px">${esc(sq.question||'')}</textarea>
       <div class="img-upload-zone">
         <button type="button" class="img-upload-btn" onclick="pickImage('lq-img-data-${si}','lq-img-preview-${si}')">📷 Add Image</button>
