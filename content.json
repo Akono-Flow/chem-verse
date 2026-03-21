@@ -5,34 +5,6 @@
     "passwordHash": "e76c083cdb3d449f169b1047f94e047cc2ee6f74a3c2439d0a2e8ea2494e2213"
   },
   "topics": {
-    "2019-P1": {
-      "title": "MCQ",
-      "learnBlocks": [],
-      "practice": [
-        {
-          "question": "The volatility of organic compounds depends on the strength of the intermolecular forces present. Which of the following compounds would be MOST volatile?",
-          "options": [
-            "$\\ce{CH3CH2CH2OH}$",
-            "$\\ce{CH3CH2CH2CH3}$",
-            "$\\ce{CH3CH(CH3)CH3}$",
-            "$\\ce{CH3CH2CH2COOH}$"
-          ],
-          "correct": 2,
-          "explanation": "It has the __weakest intermolecular forces__ due to branching, making it the **most volatile**."
-        },
-        {
-          "question": "Pentane has the molecular formula C5H12. How many possible isomers does this compound have?",
-          "options": [
-            "4",
-            "3",
-            "2",
-            "1"
-          ],
-          "correct": 1,
-          "explanation": "Only three isomers possible.\n n-pentane (straight chain)\n 2-methylbutane (one branch)\n 2, 2-dimethylpropane (highly branched)"
-        }
-      ]
-    },
     "1.1": {
       "title": "Bonding in Carbon Compounds",
       "learnBlocks": [
